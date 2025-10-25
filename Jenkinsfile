@@ -1,61 +1,72 @@
 pipeline {
   agent any
+
   environment {
-    # if Jenkins runs inside cluster and can reach argocd via cluster DNS, change this to the in-cluster service
-    ARGO_SERVER = 'argocd-server.argocd.svc.cluster.local:443'
+    DOCKERHUB_CREDS = "dockerhub-creds"   // Jenkins credential ID for Docker Hub
+    GIT_CREDS       = "github-creds"      // Jenkins credential ID for GitHub (username/token)
+    IMAGE_REPO      = "raheeba/mysite"    // change to your Docker Hub repo (user/repo)
+    CHART_VALUES    = "charts/mysite/values.yaml"
+    GIT_REMOTE_URL  = "https://github.com/Raheeba-cloud/jenkin-pipeline.git" // change to your repo URL
+    GIT_BRANCH      = "main"              // branch ArgoCD watches
   }
+
   stages {
     stage('Checkout') {
       steps {
         checkout scm
+        script {
+          GIT_SHA = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          IMAGE_TAG = "${GIT_SHA}"
+          echo "Using image tag: ${IMAGE_TAG}"
+        }
       }
     }
 
-    stage('Prepare CLIs') {
+    stage('Build & Push Docker Image') {
       steps {
-        sh '''
-        set -e
-        # install argocd CLI if missing
-        if ! command -v argocd >/dev/null 2>&1; then
-          curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-          chmod +x /tmp/argocd
-          mkdir -p ~/.local/bin
-          mv /tmp/argocd ~/.local/bin/argocd || true
-          export PATH=$PATH:~/.local/bin
-        fi
-
-        # install helm if missing
-        if ! command -v helm >/dev/null 2>&1; then
-          curl -fsSL -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-          chmod +x /tmp/get_helm.sh
-          /tmp/get_helm.sh
-        fi
-
-        helm version --client || true
-        argocd version --client || true
-        '''
-      }
-    }
-
-    stage('Lint Helm') {
-      steps {
-        sh '''
-        # lint the Helm chart (non-fatal)
-        helm lint charts/mysite || true
-        '''
-      }
-    }
-
-    stage('Trigger ArgoCD sync') {
-      steps {
-        withCredentials([string(credentialsId: 'ARGO_TOKEN', variable: 'ARGO_TOKEN')]) {
+        withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDS}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
           sh '''
-          set -e
-          # login to argocd using token and sync the app
-          # If ARGO_SERVER is not reachable from the Jenkins agent, replace with NODE_IP:NODEPORT (use the NodePort you used to access the UI)
-          argocd login ${ARGO_SERVER} --insecure --auth-token ${ARGO_TOKEN} || true
-          argocd app sync mysite
-          argocd app wait mysite --health --timeout 120
+            echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
+            docker build -t ${IMAGE_REPO}:latest -t ${IMAGE_REPO}:${IMAGE_TAG} .
+            docker push ${IMAGE_REPO}:latest
+            docker push ${IMAGE_REPO}:${IMAGE_TAG}
+            docker logout
+          '''
+        }
+      }
+    }
+
+    stage('Update Helm values and Push to Git (trigger ArgoCD)') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: "${GIT_CREDS}", usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
+          sh '''
+            set -e
+            git config user.email "jenkins@ci"
+            git config user.name "jenkins-ci"
+
+            # create branch for change
+            BRANCH="ci/update-image-${IMAGE_TAG}"
+            git checkout -b ${BRANCH}
+
+            # in-place edit of values.yaml using python (no external YAML lib required)
+            python3 - <<PY
+import os, re
+f = os.getenv("CHART_VALUES")
+repo = os.getenv("IMAGE_REPO")
+tag = os.getenv("IMAGE_TAG")
+s = open(f).read()
+new = "image:\\n  repository: %s\\n  tag: %s" % (repo, tag)
+s2 = re.sub(r'(?ms)^image:\\n\\s*repository:.*?\\n\\s*tag:.*', new, s)
+if s2 == s:
+    s2 = new + "\\n\\n" + s
+open(f, "w").write(s2)
+PY
+
+            git add ${CHART_VALUES}
+            git commit -m "ci: update chart image to ${IMAGE_REPO}:${IMAGE_TAG}" || true
+
+            # push back to repo using HTTPS token
+            git push "https://${GH_USER}:${GH_TOKEN}@${GIT_REMOTE_URL#https://}" HEAD:${GIT_BRANCH}
           '''
         }
       }
@@ -63,8 +74,11 @@ pipeline {
   }
 
   post {
-    always {
-      echo "Pipeline finished"
+    success {
+      echo "Build, push and Git update complete. ArgoCD should detect and sync the change."
+    }
+    failure {
+      echo "Pipeline failed — check console output"
     }
   }
 }
