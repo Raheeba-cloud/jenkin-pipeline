@@ -6,13 +6,19 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/Raheebaa/jenkins-pipeline'
-    targetRevision: jenkins-pipeline
+    # Git repo containing your Helm chart and k8s manifests
+    repoURL: 'https://github.com/Raheeba-cloud/jenkin-pipeline.git'
+    # path inside the repo that contains the chart/manifests for mysite
     path: charts/mysite
+    targetRevision: main
+    # If you are deploying a Helm chart with values file, ArgoCD will render it.
+    # You can also point to a directory with plain k8s manifests instead.
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: default
+    namespace: mysite
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
