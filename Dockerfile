@@ -1,15 +1,13 @@
-# Simple single-container image with nginx + php-fpm (alpine)
-# Good for a simple demo/small form. For production consider multi-container (nginx + php-fpm) or proper process manager.
 FROM php:8.1-fpm-alpine
 
 # Install nginx and bash (for simple startup wrapper)
 RUN apk add --no-cache nginx bash
 
-# Create web root
-RUN mkdir -p /var/www/html /run/nginx
+# Create web root and nginx log/run dirs
+RUN mkdir -p /var/www/html /run/nginx /var/log/nginx
 
-# Copy nginx config
-COPY app/nginx.conf /etc/nginx/conf.d/default.conf
+# Copy proper nginx main config (we will copy app/nginx.conf into /etc/nginx/nginx.conf)
+COPY app/nginx.conf /etc/nginx/nginx.conf
 
 # Copy app code
 COPY app /var/www/html
@@ -20,6 +18,5 @@ RUN chown -R www-data:www-data /var/www/html
 # Expose port
 EXPOSE 80
 
-# Simple entrypoint: start php-fpm in foreground and run nginx (nginx foreground via daemon off)
-# php-fpm -F (foreground), then run nginx in foreground
+# Start php-fpm and nginx (php-fpm foreground + nginx foreground)
 CMD ["sh", "-c", "php-fpm -F & nginx -g 'daemon off;'"]
