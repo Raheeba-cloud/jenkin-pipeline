@@ -15,23 +15,42 @@ pipeline {
       steps {
         checkout scm
         script {
-          GIT_SHA = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          IMAGE_TAG = "${GIT_SHA}"
-          echo "Using image tag: ${IMAGE_TAG}"
+          // Use Jenkins build number for the image tag
+          env.IMAGE_TAG = "${env.BUILD_NUMBER}"
+          echo "Using image tag (build number): ${env.IMAGE_TAG}"
         }
+      }
+    }
+
+    stage('Agent pre-checks') {
+      steps {
+        sh '''
+          set -euo pipefail
+          echo "Checking required commands..."
+          for cmd in docker git; do
+            if ! command -v $cmd >/dev/null 2>&1; then
+              echo "ERROR: required command '$cmd' not found on agent. Install it or use an agent/pod that provides it."
+              exit 127
+            fi
+          done
+          echo "docker version:"
+          docker --version || true
+        '''
       }
     }
 
     stage('Build & Push Docker Image') {
       steps {
         withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDS}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
-          sh '''
+          sh """
+            set -euo pipefail
+            set -x
             echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-            docker build -t ${IMAGE_REPO}:latest -t ${IMAGE_REPO}:${IMAGE_TAG} .
+            docker build --pull -t ${IMAGE_REPO}:latest -t ${IMAGE_REPO}:${IMAGE_TAG} .
             docker push ${IMAGE_REPO}:latest
             docker push ${IMAGE_REPO}:${IMAGE_TAG}
             docker logout
-          '''
+          """
         }
       }
     }
@@ -39,35 +58,31 @@ pipeline {
     stage('Update Helm values and Push to Git (trigger ArgoCD)') {
       steps {
         withCredentials([usernamePassword(credentialsId: "${GIT_CREDS}", usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
-          sh '''
-            set -e
-            git config user.email "jenkins@ci"
-            git config user.name "jenkins-ci"
+          script {
+            def valsPath = "${env.WORKSPACE}/${CHART_VALUES}"
+            def text = readFile(file: valsPath)
+            def repoLine = "  repository: \"${IMAGE_REPO}\""
+            def tagLine  = "  tag: \"${IMAGE_TAG}\""
+            if (text =~ /(?m)^image:\n(?:[ \t].*\n)*$/) {
+              text = text.replaceAll("(?ms)^image:\\n(?:\\s*repository:.*\\n)?(?:\\s*tag:.*\\n)?", "image:\\n${repoLine}\\n${tagLine}\\n")
+            } else {
+              text = "image:\\n${repoLine}\\n${tagLine}\\n\n" + text
+            }
+            writeFile(file: valsPath, text: text)
 
-            # create branch for change
-            BRANCH="ci/update-image-${IMAGE_TAG}"
-            git checkout -b ${BRANCH}
-
-            # in-place edit of values.yaml using python (no external YAML lib required)
-            python3 - <<PY
-import os, re
-f = os.getenv("CHART_VALUES")
-repo = os.getenv("IMAGE_REPO")
-tag = os.getenv("IMAGE_TAG")
-s = open(f).read()
-new = "image:\\n  repository: %s\\n  tag: %s" % (repo, tag)
-s2 = re.sub(r'(?ms)^image:\\n\\s*repository:.*?\\n\\s*tag:.*', new, s)
-if s2 == s:
-    s2 = new + "\\n\\n" + s
-open(f, "w").write(s2)
-PY
-
-            git add ${CHART_VALUES}
-            git commit -m "ci: update chart image to ${IMAGE_REPO}:${IMAGE_TAG}" || true
-
-            # push back to repo using HTTPS token
-            git push "https://${GH_USER}:${GH_TOKEN}@${GIT_REMOTE_URL#https://}" HEAD:${GIT_BRANCH}
-          '''
+            sh """
+              set -euo pipefail
+              set -x
+              git config user.email "jenkins@ci"
+              git config user.name "jenkins-ci"
+              git checkout -b ci/update-image-${IMAGE_TAG}
+              git add ${CHART_VALUES}
+              git commit -m "ci: update chart image to ${IMAGE_REPO}:${IMAGE_TAG}" || true
+              REMOTE="${GIT_REMOTE_URL}"
+              REMOTE_NO_PROTO=$(echo "$REMOTE" | sed 's#^https://##')
+              git push "https://${GH_USER}:${GH_TOKEN}@${REMOTE_NO_PROTO}" HEAD:${GIT_BRANCH}
+            """
+          }
         }
       }
     }

@@ -1,0 +1,10 @@
+master:
+  serviceType: NodePort
+  containerPort: 8080
+  resources:
+    requests:
+      memory: "512Mi"
+persistence:
+  enabled: false
+rbac:
+  create: true

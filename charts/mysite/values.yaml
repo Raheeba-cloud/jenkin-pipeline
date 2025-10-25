@@ -1,9 +1,15 @@
 replicaCount: 1
 
 image:
-  repository: nginx
-  tag: "alpine"
+  repository: "raheeba/mysite"
+  tag: "latest"
+  pullPolicy: IfNotPresent
 
 service:
-  type: NodePort
+  type: ClusterIP
   port: 80
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

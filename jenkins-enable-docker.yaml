@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: jenkins
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: install-docker-cli
+          image: alpine:3.18
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eux
+              apk add --no-cache curl tar
+              # download a static docker client tarball and extract
+              curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-24.0.5.tgz" | tar xz
+              # move docker client into the shared volume
+              mv docker/docker /docker-bin/docker
+              chmod +x /docker-bin/docker
+          volumeMounts:
+            - name: docker-bin
+              mountPath: /docker-bin
+      containers:
+        - name: jenkins
+          # note: keep the existing image (we are patching only volumes & securityContext)
+          volumeMounts:
+            - name: docker-bin
+              mountPath: /usr/local/bin
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+          securityContext:
+            runAsUser: 0
+      volumes:
+        - name: docker-bin
+          emptyDir: {}
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: File
