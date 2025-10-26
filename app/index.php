@@ -101,7 +101,7 @@
   <div class="form-container">
     <h1>Contact Us</h1>
     <form method="POST" action="/submit.php">
-      <label>Enter The Name:
+      <label>Name:
         <input type="text" name="name" required>
       </label>
 
