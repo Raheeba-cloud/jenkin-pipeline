@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDS = "dockerhub-creds"   // Jenkins credential ID for Docker Hub
-        GIT_CREDS       = "github-creds"      // Jenkins credential ID for GitHub
+        DOCKERHUB_CREDS = "docker-hub-credentials"   // Jenkins credential ID for Docker Hub
+        GIT_CREDS       = "git"      // Jenkins credential ID for GitHub
         IMAGE_REPO      = "raheeba/mysite"    // Docker Hub repo
         CHART_VALUES    = "charts/mysite/values.yaml"
         GIT_REMOTE_URL  = "https://github.com/Raheeba-cloud/jenkin-pipeline.git"
