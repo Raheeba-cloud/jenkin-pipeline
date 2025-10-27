@@ -5,10 +5,8 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   selector:
-    app.kubernetes.io/name: {{ include "mysite.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: {{ include "mysite.name" . }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: 80
-      protocol: TCP
-      name: http
+      nodePort: {{ .Values.service.nodePort | default 30085 }}

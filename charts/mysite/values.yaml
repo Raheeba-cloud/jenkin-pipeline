@@ -1,15 +1,14 @@
 replicaCount: 1
 
 image:
-  repository: "raheeba/my-php-site"    # <- UPDATED to the repo Jenkins pushes to
-  tag: "latest"                        # Helm will use value from values.yaml; Jenkins will update this
-  pullPolicy: IfNotPresent
-
-imagePullSecrets: []   # add names here if your Docker Hub repo is private, e.g. ["regcred"]
+  repository: "raheeba/my-php-site"
+  tag: "latest"
+  pullPolicy: Always
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 80
+  nodePort: 30085  # Optional: access outside cluster via 30085
 
 resources: {}
 nodeSelector: {}

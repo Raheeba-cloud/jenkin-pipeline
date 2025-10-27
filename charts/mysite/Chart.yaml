@@ -1,6 +1,6 @@
 apiVersion: v2
 name: mysite
-description: A tiny static site served by nginx via a ConfigMap
+description: PHP + Nginx web app deployed via Helm
 type: application
 version: 0.1.0
 appVersion: "1.0"
