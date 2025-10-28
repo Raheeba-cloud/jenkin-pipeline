@@ -7,12 +7,13 @@ pipeline {
     IMAGE_NAME = 'raheeba/my-php-site'     // Docker Hub repo name
     CHART_PATH = "charts/mysite"
     IMAGE_TAG = "${env.BUILD_NUMBER}"
+    REPO_URL = 'https://github.com/Raheeba-cloud/jenkin-pipeline.git'
   }
 
   stages {
     stage('Checkout') {
       steps {
-        // Use same repo that contains Jenkinsfile
+        echo "📥 Checking out source code..."
         checkout scm
       }
     }
@@ -20,7 +21,7 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         script {
-          echo ":hammer: Building Docker image ${IMAGE_NAME}:${IMAGE_TAG}"
+          echo "🔨 Building Docker image ${IMAGE_NAME}:${IMAGE_TAG}"
           dockerImage = docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
         }
       }
@@ -44,6 +45,7 @@ pipeline {
           echo "📝 Updating Helm values.yaml with new tag..."
           sh """
             sed -i 's|tag:.*|tag: "${IMAGE_TAG}"|' ${CHART_PATH}/values.yaml
+            echo "Updated values.yaml:"
             cat ${CHART_PATH}/values.yaml
           """
         }
@@ -55,14 +57,14 @@ pipeline {
         script {
           echo "🧭 Committing Helm update to GitHub..."
           withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-            sh '''
+            sh """
               git config user.email "jenkins@local"
               git config user.name "Jenkins"
 
               git add ${CHART_PATH}/values.yaml
               git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
               git push https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git HEAD:main
-            '''
+            """
           }
         }
       }
