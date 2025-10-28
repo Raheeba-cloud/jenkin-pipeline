@@ -1,27 +1,20 @@
-# Number of pod replicas
 replicaCount: 1
 
-# Docker image configuration
 image:
-  repository: "raheeba/mysite"    # ✅ Your image built from the new Dockerfile
-  tag: "latest"                   # Use specific tag (e.g., v1.0) in production
-  pullPolicy: Always              # Always pull the latest version
+  repository: "raheeba/my-php-site"   # ✅ Correct image name
+  tag: "35"                           # ✅ Correct tag version
+  pullPolicy: Always
 
-# Kubernetes Service configuration
 service:
-  type: NodePort                  # Expose service externally
-  port: 80                        # Container port (Nginx listens on 80)
-  nodePort: 30085                 # External port on node (accessible via http://<nodeIP>:30085)
+  type: NodePort
+  port: 80
+  nodePort: 30085
 
-# Optional resource requests/limits (can tune later)
 resources: {}
-
-# Scheduling rules (can be left empty)
 nodeSelector: {}
 tolerations: []
 affinity: {}
 
-# Optional ingress configuration (for future use)
 ingress:
   enabled: false
   className: ""
