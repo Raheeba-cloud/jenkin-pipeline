@@ -6,11 +6,14 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/raheeba/jenkins-pipeline.git'
-    path: charts/mysite
+    repoURL: 'https://github.com/Raheeba-cloud/jenkin-pipeline.git'
     targetRevision: main
+    path: charts/mysite
+    helm:
+      valueFiles:
+        - values.yaml
   destination:
-    server: https://kubernetes.default.svc
+    server: 'https://kubernetes.default.svc'
     namespace: mysite
   syncPolicy:
     automated:

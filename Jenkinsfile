@@ -2,12 +2,12 @@ pipeline {
   agent any
 
   environment {
-    GIT_CRED = 'git'                       
-    DOCKER_CRED = 'docker-hub-credentials' 
-    IMAGE_NAME = 'raheeba/my-php-site'     
+    GIT_CRED = 'git'
+    DOCKER_CRED = 'docker-hub-credentials'
+    IMAGE_NAME = 'raheeba/my-php-site'
     IMAGE_TAG = "${env.BUILD_NUMBER}"
-    CONTAINER_NAME = 'my-php-site'
-    HOST_PORT = '8085'
+    CHART_PATH = "charts/mysite"
+    REPO_URL = 'https://github.com/Raheeba-cloud/jenkin-pipeline.git'
   }
 
   stages {
@@ -38,31 +38,50 @@ pipeline {
       }
     }
 
-    stage('Clean up local image') {
+    stage('Update Helm values.yaml') {
       steps {
         script {
-          echo "🧹 Cleaning local Docker image..."
-          sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
+          echo "📝 Updating Helm values.yaml with new image tag..."
+          sh '''
+          sed -i "s|tag:.*|tag: \\"${IMAGE_TAG}\\"|" ${CHART_PATH}/values.yaml
+          '''
         }
       }
     }
 
-    stage('Deploy') {
+    stage('Commit & Push Helm Update') {
       steps {
         script {
-          echo "🚀 Deploying latest container..."
-          // Stop old container if it exists
-          sh "docker stop ${CONTAINER_NAME} || true"
-          sh "docker rm ${CONTAINER_NAME} || true"
-          // Run new container with latest image
-          sh "docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:80 ${IMAGE_NAME}:latest"
+          echo "🧭 Committing Helm chart changes to GitHub..."
+          sh '''
+          git config user.email "jenkins@local"
+          git config user.name "Jenkins"
+          git add ${CHART_PATH}/values.yaml
+          git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
+          git push https://${GIT_CRED_USR}:${GIT_CRED_PSW}@github.com/Raheeba-cloud/jenkin-pipeline.git HEAD:main
+          '''
+        }
+      }
+    }
+
+    stage('Trigger ArgoCD Sync') {
+      steps {
+        script {
+          echo "🔁 Forcing ArgoCD to sync latest changes..."
+          sh '''
+          microk8s kubectl patch application mysite -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' || true
+          '''
         }
       }
     }
   }
 
   post {
-    success { echo "✅ Build, push, and deploy completed successfully!" }
-    failure { echo "❌ Build or deploy failed. Check logs for details." }
+    success {
+      echo "✅ Successfully built, pushed, and deployed via ArgoCD!"
+    }
+    failure {
+      echo "❌ Pipeline failed! Check logs for details."
+    }
   }
 }
