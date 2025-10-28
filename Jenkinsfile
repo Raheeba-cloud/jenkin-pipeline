@@ -2,8 +2,8 @@ pipeline {
   agent any
 
   environment {
-    GIT_CRED = 'git'
-    DOCKER_CRED = 'docker-hub-credentials'
+    GIT_CRED = 'git'                                // Jenkins GitHub credentials ID
+    DOCKER_CRED = 'docker-hub-credentials'          // Jenkins Docker Hub credentials ID
     IMAGE_NAME = 'raheeba/my-php-site'
     IMAGE_TAG = "${env.BUILD_NUMBER}"
     CHART_PATH = "charts/mysite"
@@ -11,9 +11,14 @@ pipeline {
   }
 
   stages {
+
     stage('Checkout') {
       steps {
-        checkout scm
+        script {
+          echo "📥 Checking out repository..."
+          checkout scm
+          sh 'pwd && ls -la'
+        }
       }
     }
 
@@ -40,26 +45,33 @@ pipeline {
 
     stage('Update Helm values.yaml') {
       steps {
-        script {
-          echo "📝 Updating Helm values.yaml with new image tag..."
-          sh '''
-          sed -i "s|tag:.*|tag: \\"${IMAGE_TAG}\\"|" ${CHART_PATH}/values.yaml
-          '''
+        dir("${WORKSPACE}") {
+          script {
+            echo "📝 Updating Helm values.yaml with new image tag..."
+            sh """
+            sed -i 's|tag:.*|tag: \\"${IMAGE_TAG}\\"|' ${CHART_PATH}/values.yaml
+            """
+          }
         }
       }
     }
 
     stage('Commit & Push Helm Update') {
       steps {
-        script {
-          echo "🧭 Committing Helm chart changes to GitHub..."
-          sh '''
-          git config user.email "jenkins@local"
-          git config user.name "Jenkins"
-          git add ${CHART_PATH}/values.yaml
-          git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
-          git push https://${GIT_CRED_USR}:${GIT_CRED_PSW}@github.com/Raheeba-cloud/jenkin-pipeline.git HEAD:main
-          '''
+        dir("${WORKSPACE}") {
+          script {
+            echo "🧭 Committing Helm chart changes to GitHub..."
+            withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+              sh """
+              git config --global user.email "jenkins@local"
+              git config --global user.name "Jenkins"
+              git remote set-url origin https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git
+              git add ${CHART_PATH}/values.yaml
+              git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
+              git push origin main
+              """
+            }
+          }
         }
       }
     }
@@ -67,10 +79,11 @@ pipeline {
     stage('Trigger ArgoCD Sync') {
       steps {
         script {
-          echo "🔁 Forcing ArgoCD to sync latest changes..."
-          sh '''
+          echo "🔁 Triggering ArgoCD sync for latest Helm chart..."
+          sh """
           microk8s kubectl patch application mysite -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' || true
-          '''
+          microk8s kubectl annotate application mysite -n argocd argocd.argoproj.io/sync-options=Force=true --overwrite || true
+          """
         }
       }
     }
@@ -78,10 +91,10 @@ pipeline {
 
   post {
     success {
-      echo "✅ Successfully built, pushed, and deployed via ArgoCD!"
+      echo "✅ CI/CD Pipeline completed successfully — deployed via ArgoCD!"
     }
     failure {
-      echo "❌ Pipeline failed! Check logs for details."
+      echo "❌ Pipeline failed — check logs for errors."
     }
   }
 }
