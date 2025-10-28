@@ -16,7 +16,15 @@ pipeline {
       steps {
         script {
           echo "📥 Checking out source code..."
-          checkout scm
+          deleteDir() // ensure a clean workspace
+          checkout([
+            $class: 'GitSCM',
+            branches: [[name: '*/main']],
+            userRemoteConfigs: [[
+              url: "${REPO_URL}",
+              credentialsId: "${GIT_CRED}"
+            ]]
+          ])
           sh 'echo "✅ Current directory:" && pwd && echo "📂 Files:" && ls -la'
         }
       }
@@ -48,8 +56,8 @@ pipeline {
         script {
           echo "📝 Updating Helm values.yaml with new tag..."
           sh """
-          sed -i 's|tag:.*|tag: "${IMAGE_TAG}"|' ${CHART_PATH}/values.yaml
-          cat ${CHART_PATH}/values.yaml
+            sed -i 's|tag:.*|tag: "${IMAGE_TAG}"|' ${CHART_PATH}/values.yaml
+            cat ${CHART_PATH}/values.yaml
           """
         }
       }
@@ -61,20 +69,19 @@ pipeline {
           echo "🧭 Committing Helm update to GitHub..."
           withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
             sh """
-            echo "🔍 Checking git status..."
-            git status || echo "⚠️ Not a git repo, initializing..."
-            if [ ! -d .git ]; then
-              git init
-              git remote add origin ${REPO_URL}
-              git fetch origin main
-              git checkout -B main origin/main || git checkout -B main
-            fi
+              echo "🔍 Ensuring git repo initialized..."
+              if [ ! -d .git ]; then
+                git init
+                git remote add origin ${REPO_URL}
+                git fetch origin main || true
+                git checkout -B main origin/main || git checkout -B main
+              fi
 
-            git config user.email "jenkins@local"
-            git config user.name "Jenkins"
-            git add ${CHART_PATH}/values.yaml
-            git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
-            git push https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git HEAD:main
+              git config user.email "jenkins@local"
+              git config user.name "Jenkins"
+              git add ${CHART_PATH}/values.yaml
+              git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
+              git push https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git HEAD:main
             """
           }
         }
@@ -86,8 +93,8 @@ pipeline {
         script {
           echo "🔁 Triggering ArgoCD sync..."
           sh """
-          microk8s kubectl patch application mysite -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' || true
-          microk8s kubectl annotate application mysite -n argocd argocd.argoproj.io/sync-options=Force=true --overwrite || true
+            microk8s kubectl patch application mysite -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' || true
+            microk8s kubectl annotate application mysite -n argocd argocd.argoproj.io/sync-options=Force=true --overwrite || true
           """
         }
       }
