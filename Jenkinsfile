@@ -21,7 +21,7 @@ pipeline {
     stage('Checkout — full clone') {
       steps {
         script {
-          echo "📥 Doing a full authenticated checkout (${GIT_BRANCH})"
+          echo "📥 Full authenticated checkout (${GIT_BRANCH})"
           checkout([
             $class: 'GitSCM',
             branches: [[name: "*/${GIT_BRANCH}"]],
@@ -34,11 +34,8 @@ pipeline {
           sh '''
             echo "Workspace: $WORKSPACE"
             pwd
-            echo "Files:"
             ls -la
-            echo "Git remote:"
             git remote -v || true
-            echo "Git inside worktree?"
             git rev-parse --is-inside-work-tree || true
           '''
         }
@@ -57,7 +54,7 @@ pipeline {
     stage('Push to Docker Hub') {
       steps {
         script {
-          echo "📤 Pushing image ${IMAGE_NAME}:${IMAGE_TAG} to Docker Hub"
+          echo "📤 Pushing image to Docker Hub"
           docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CRED}") {
             dockerImage.push("${IMAGE_TAG}")
             dockerImage.push('latest')
@@ -71,16 +68,15 @@ pipeline {
         script {
           echo "📝 Update Helm values.yaml with tag ${IMAGE_TAG}"
           sh '''
-            set -eux
-            if [ ! -f "$CHART_PATH/values.yaml" ]; then
-              echo "ERROR: $CHART_PATH/values.yaml not found"
+            set -eu
+            if [ ! -f "${CHART_PATH}/values.yaml" ]; then
+              echo "ERROR: ${CHART_PATH}/values.yaml not found" >&2
               exit 1
             fi
-            # replace tag line (preserving indentation)
-            sed -i.bak -E "s/^(\\s*tag:\\s*).*/\\1\"${IMAGE_TAG}\"/" "$CHART_PATH/values.yaml" || true
-            echo "---- updated $CHART_PATH/values.yaml ----"
-            cat "$CHART_PATH/values.yaml"
-            echo "------------------------------------------"
+            sed -i.bak -E "s/^(\\s*tag:\\s*).*/\\1\"${IMAGE_TAG}\"/" "${CHART_PATH}/values.yaml" || true
+            echo "---- ${CHART_PATH}/values.yaml ----"
+            cat "${CHART_PATH}/values.yaml"
+            echo "-----------------------------------"
           '''
         }
       }
@@ -90,37 +86,35 @@ pipeline {
       steps {
         script {
           echo "🔁 Commit & push Helm change"
-          // IMPORTANT: use single-quoted sh block so secrets are expanded by the shell (not interpolated by Groovy)
           withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+            // We deliberately do NOT enable -x here to avoid printing the push command (which causes masking issues).
             sh '''
-              set -eux
+              set -euo pipefail
 
-              # ensure we're at repo root and .git exists
               pwd
               ls -la
 
               if [ ! -d .git ]; then
-                echo "⚠️ .git not found - something is wrong; aborting push"
+                echo "⚠️ .git not found - aborting push" >&2
                 exit 1
               fi
 
               git config user.email "jenkins@local"
               git config user.name "Jenkins"
 
-              git add "$CHART_PATH/values.yaml"
+              git add "${CHART_PATH}/values.yaml" || true
 
-              # Only commit & push if there are staged changes
               if git diff --cached --quiet; then
                 echo "No changes to commit"
               else
-                git commit -m "ci: Update image tag to $IMAGE_TAG [skip ci]" || true
+                git commit -m "ci: Update image tag to ${IMAGE_TAG} [skip ci]" || true
 
-                # create a push URL using shell variables and strip protocol safely
-                REPO_NO_PROTO=$(echo "$REPO_URL" | sed -e 's#^https://##')
+                # Build push URL inside shell and quote it as a single argument.
+                REPO_NO_PROTO=$(echo "${REPO_URL}" | sed -e 's#^https://##' -e 's#^http://##')
                 PUSH_URL="https://${GIT_USER}:${GIT_PASS}@${REPO_NO_PROTO}"
 
-                # Quote the whole push URL so it is treated as a single argument
-                git push "$PUSH_URL" "HEAD:${GIT_BRANCH}"
+                # Perform the push without printing the full command (so masking won't corrupt it)
+                git push "${PUSH_URL}" "HEAD:${GIT_BRANCH}"
               fi
             '''
           }
@@ -128,12 +122,13 @@ pipeline {
       }
     }
 
-    stage('Trigger ArgoCD Sync') {
+    stage('Trigger ArgoCD sync') {
       steps {
         script {
-          echo "🔁 Triggering ArgoCD sync..."
+          echo "🔁 Triggering ArgoCD sync (if configured)..."
           sh '''
             set -eux || true
+            # If you are using kubectl via a Jenkins kubeconfig credential, ensure that is configured.
             microk8s kubectl -n argocd patch application mysite --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' || true
             microk8s kubectl -n argocd annotate application mysite argocd.argoproj.io/sync-options=Force=true --overwrite || true
           '''
@@ -141,7 +136,7 @@ pipeline {
       }
     }
 
-    stage('Clean up') {
+    stage('Cleanup local images') {
       steps {
         script {
           echo "🧹 Cleaning local Docker image"
