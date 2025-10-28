@@ -11,6 +11,7 @@ pipeline {
   }
 
   stages {
+
     stage('Checkout') {
       steps {
         echo "📥 Checking out source code..."
@@ -45,7 +46,7 @@ pipeline {
           echo "📝 Updating Helm values.yaml with new tag..."
           sh """
             sed -i 's|tag:.*|tag: "${IMAGE_TAG}"|' ${CHART_PATH}/values.yaml
-            echo "Updated values.yaml:"
+            echo "✅ Updated values.yaml:"
             cat ${CHART_PATH}/values.yaml
           """
         }
@@ -56,14 +57,21 @@ pipeline {
       steps {
         script {
           echo "🧭 Committing Helm update to GitHub..."
+
           withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-            sh """
+
+            // ✅ Build clean push URL in Groovy first (avoids space and interpolation issues)
+            def repoUrl = "https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git"
+
+            sh '''
               git config user.email "jenkins@local"
               git config user.name "Jenkins"
+            '''
 
+            sh """
               git add ${CHART_PATH}/values.yaml
               git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
-              git push https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git HEAD:main
+              git push ${repoUrl} HEAD:main
             """
           }
         }
