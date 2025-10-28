@@ -1,41 +1,23 @@
 pipeline {
   agent any
-  options {
-    skipDefaultCheckout(true)
-  }
-
   environment {
-    GIT_CRED = 'git'                                // Jenkins GitHub credentials ID
-    DOCKER_CRED = 'docker-hub-credentials'          // Jenkins Docker Hub credentials ID
-    IMAGE_NAME = 'raheeba/my-php-site'
-    IMAGE_TAG = "${env.BUILD_NUMBER}"
+    GIT_CRED = 'git'                       // Jenkins credential id for GitHub (username + PAT)
+    DOCKER_CRED = 'docker-hub-credentials' // Docker Hub credential id in Jenkins
+    IMAGE_NAME = 'raheeba/my-php-site'     // <-- set your Docker Hub repo name
     CHART_PATH = "charts/mysite"
-    REPO_URL = 'https://github.com/Raheeba-cloud/jenkin-pipeline.git'
+    IMAGE_TAG = "${env.BUILD_NUMBER}"
   }
-
   stages {
-
     stage('Checkout') {
       steps {
-        script {
-          echo "📥 Cloning repository manually..."
-          deleteDir()
-          withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-            sh """
-              git clone https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git .
-              git checkout main
-              echo "✅ Current directory:" && pwd
-              echo "📂 Files:" && ls -la
-            """
-          }
-        }
+        // Use the same repo that contains the Jenkinsfile (safer)
+        checkout scm
       }
     }
-
     stage('Build Docker Image') {
       steps {
         script {
-          echo "🔨 Building Docker image ${IMAGE_NAME}:${IMAGE_TAG}"
+          echo ":hammer: Building Docker image ${IMAGE_NAME}:${IMAGE_TAG}"
           dockerImage = docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
         }
       }
