@@ -1,19 +1,22 @@
 pipeline {
   agent any
+
   environment {
     GIT_CRED = 'git'                       // Jenkins credential id for GitHub (username + PAT)
     DOCKER_CRED = 'docker-hub-credentials' // Docker Hub credential id in Jenkins
-    IMAGE_NAME = 'raheeba/my-php-site'     // <-- set your Docker Hub repo name
+    IMAGE_NAME = 'raheeba/my-php-site'     // Docker Hub repo name
     CHART_PATH = "charts/mysite"
     IMAGE_TAG = "${env.BUILD_NUMBER}"
   }
+
   stages {
     stage('Checkout') {
       steps {
-        // Use the same repo that contains the Jenkinsfile (safer)
+        // Use same repo that contains Jenkinsfile
         checkout scm
       }
     }
+
     stage('Build Docker Image') {
       steps {
         script {
@@ -52,14 +55,14 @@ pipeline {
         script {
           echo "🧭 Committing Helm update to GitHub..."
           withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-            sh """
+            sh '''
               git config user.email "jenkins@local"
               git config user.name "Jenkins"
 
               git add ${CHART_PATH}/values.yaml
               git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
               git push https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git HEAD:main
-            """
+            '''
           }
         }
       }
