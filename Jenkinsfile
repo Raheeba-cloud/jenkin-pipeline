@@ -1,5 +1,8 @@
 pipeline {
   agent any
+  options {
+    skipDefaultCheckout(true)
+  }
 
   environment {
     GIT_CRED = 'git'                                // Jenkins GitHub credentials ID
