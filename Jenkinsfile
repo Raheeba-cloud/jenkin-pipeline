@@ -12,11 +12,13 @@ pipeline {
 
   stages {
 
-    stage('Verify Workspace') {
+    stage('Checkout') {
       steps {
         script {
-          echo "📁 Verifying workspace contents..."
-          sh 'pwd && ls -la'
+          echo "📥 Checking out source code..."
+          deleteDir()
+          checkout scm    // ✅ uses Jenkins job SCM (no extra Git fetch issue)
+          sh 'echo "✅ Current directory:" && pwd && echo "📂 Files:" && ls -la'
         }
       }
     }
@@ -60,16 +62,13 @@ pipeline {
           echo "🧭 Committing Helm update to GitHub..."
           withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
             sh """
-              echo "🔍 Ensuring git repo initialized..."
-              if [ ! -d .git ]; then
-                git init
-                git remote add origin ${REPO_URL}
-                git fetch origin main || true
-                git checkout -B main origin/main || git checkout -B main
-              fi
-
               git config user.email "jenkins@local"
               git config user.name "Jenkins"
+
+              # Ensure repo has a remote (in case checkout scm detached)
+              git remote remove origin || true
+              git remote add origin ${REPO_URL}
+
               git add ${CHART_PATH}/values.yaml
               git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
               git push https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git HEAD:main
