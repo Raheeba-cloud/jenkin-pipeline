@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: "raheeba/my-php-site"
-  tag: 31
+  tag: 32
   pullPolicy: Always
 
 service:
