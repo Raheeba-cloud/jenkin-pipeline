@@ -1,22 +1,28 @@
+# Base image: PHP with FPM support
 FROM php:8.1-fpm-alpine
 
-# Install nginx and bash (for simple startup wrapper)
-RUN apk add --no-cache nginx bash
+# Install nginx and bash (for debugging or multi-process startup)
+RUN apk add --no-cache nginx bash curl
 
-# Create web root and nginx log/run dirs
+# Create required directories
 RUN mkdir -p /var/www/html /run/nginx /var/log/nginx
 
-# Copy proper nginx main config (we will copy app/nginx.conf into /etc/nginx/nginx.conf)
+# Copy application files
+COPY app/ /var/www/html/
+
+# Copy nginx configuration (replace default)
 COPY app/nginx.conf /etc/nginx/nginx.conf
 
-# Copy app code
-COPY app /var/www/html
+# Fix ownership and permissions
+RUN chown -R www-data:www-data /var/www/html && \
+    chmod -R 755 /var/www/html
 
-# Ensure ownership
-RUN chown -R www-data:www-data /var/www/html
-
-# Expose port
+# Expose HTTP port
 EXPOSE 80
 
-# Start php-fpm and nginx (php-fpm foreground + nginx foreground)
-CMD ["sh", "-c", "php-fpm -F & nginx -g 'daemon off;'"]
+# Health check (optional but good practice)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost/ || exit 1
+
+# Start php-fpm (background) and nginx (foreground)
+CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]

@@ -5,7 +5,8 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   selector:
-    app: {{ include "mysite.name" . }}
+    app.kubernetes.io/name: {{ include "mysite.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: 80

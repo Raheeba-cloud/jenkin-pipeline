@@ -21,17 +21,39 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: 80
-              name: http
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+          # Health checks
           livenessProbe:
             httpGet:
               path: /
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
           readinessProbe:
             httpGet:
               path: /
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Optional resource limits (tune later if needed)
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          # Working directory and volume mount (if static files)
+          volumeMounts:
+            - name: app-content
+              mountPath: /var/www/html
+
+      # Define volume for app files (optional)
+      volumes:
+        - name: app-content
+          emptyDir: {}
