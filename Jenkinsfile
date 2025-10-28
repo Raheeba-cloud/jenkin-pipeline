@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    GIT_CRED = 'git'                                // Jenkins GitHub credentials ID
+    GIT_CRED = 'git'                                // Jenkins GitHub credentials ID (username + PAT)
     DOCKER_CRED = 'docker-hub-credentials'          // Jenkins Docker Hub credentials ID
     IMAGE_NAME = 'raheeba/my-php-site'
     IMAGE_TAG = "${env.BUILD_NUMBER}"
@@ -15,9 +15,9 @@ pipeline {
     stage('Checkout') {
       steps {
         script {
-          echo "📥 Checking out repository..."
+          echo "📥 Checking out source code..."
           checkout scm
-          sh 'pwd && ls -la'
+          sh 'echo "✅ Current directory:" && pwd && echo "📂 Files:" && ls -la'
         }
       }
     }
@@ -45,32 +45,37 @@ pipeline {
 
     stage('Update Helm values.yaml') {
       steps {
-        dir("${WORKSPACE}") {
-          script {
-            echo "📝 Updating Helm values.yaml with new image tag..."
-            sh """
-            sed -i 's|tag:.*|tag: \\"${IMAGE_TAG}\\"|' ${CHART_PATH}/values.yaml
-            """
-          }
+        script {
+          echo "📝 Updating Helm values.yaml with new tag..."
+          sh """
+          sed -i 's|tag:.*|tag: "${IMAGE_TAG}"|' ${CHART_PATH}/values.yaml
+          cat ${CHART_PATH}/values.yaml
+          """
         }
       }
     }
 
     stage('Commit & Push Helm Update') {
       steps {
-        dir("${WORKSPACE}") {
-          script {
-            echo "🧭 Committing Helm chart changes to GitHub..."
-            withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-              sh """
-              git config --global user.email "jenkins@local"
-              git config --global user.name "Jenkins"
-              git remote set-url origin https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git
-              git add ${CHART_PATH}/values.yaml
-              git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
-              git push origin main
-              """
-            }
+        script {
+          echo "🧭 Committing Helm update to GitHub..."
+          withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+            sh """
+            echo "🔍 Checking git status..."
+            git status || echo "⚠️ Not a git repo, initializing..."
+            if [ ! -d .git ]; then
+              git init
+              git remote add origin ${REPO_URL}
+              git fetch origin main
+              git checkout -B main origin/main || git checkout -B main
+            fi
+
+            git config user.email "jenkins@local"
+            git config user.name "Jenkins"
+            git add ${CHART_PATH}/values.yaml
+            git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
+            git push https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git HEAD:main
+            """
           }
         }
       }
@@ -79,7 +84,7 @@ pipeline {
     stage('Trigger ArgoCD Sync') {
       steps {
         script {
-          echo "🔁 Triggering ArgoCD sync for latest Helm chart..."
+          echo "🔁 Triggering ArgoCD sync..."
           sh """
           microk8s kubectl patch application mysite -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' || true
           microk8s kubectl annotate application mysite -n argocd argocd.argoproj.io/sync-options=Force=true --overwrite || true
@@ -87,14 +92,23 @@ pipeline {
         }
       }
     }
+
+    stage('Clean up') {
+      steps {
+        script {
+          echo "🧹 Cleaning local Docker images..."
+          sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
+        }
+      }
+    }
   }
 
   post {
     success {
-      echo "✅ CI/CD Pipeline completed successfully — deployed via ArgoCD!"
+      echo "✅ Pipeline completed successfully — image pushed & deployed via ArgoCD!"
     }
     failure {
-      echo "❌ Pipeline failed — check logs for errors."
+      echo "❌ Pipeline failed — check logs for more details."
     }
   }
 }
