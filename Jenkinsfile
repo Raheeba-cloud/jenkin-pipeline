@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    GIT_CRED = 'git'                                // Jenkins GitHub credentials ID (username + PAT)
+    GIT_CRED = 'git'                                // Jenkins GitHub credentials ID
     DOCKER_CRED = 'docker-hub-credentials'          // Jenkins Docker Hub credentials ID
     IMAGE_NAME = 'raheeba/my-php-site'
     IMAGE_TAG = "${env.BUILD_NUMBER}"
@@ -15,10 +15,16 @@ pipeline {
     stage('Checkout') {
       steps {
         script {
-          echo "📥 Checking out source code..."
+          echo "📥 Cloning repository manually..."
           deleteDir()
-          checkout scm    // ✅ uses Jenkins job SCM (no extra Git fetch issue)
-          sh 'echo "✅ Current directory:" && pwd && echo "📂 Files:" && ls -la'
+          withCredentials([usernamePassword(credentialsId: "${GIT_CRED}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+            sh """
+              git clone https://${GIT_USER}:${GIT_PASS}@github.com/Raheeba-cloud/jenkin-pipeline.git .
+              git checkout main
+              echo "✅ Current directory:" && pwd
+              echo "📂 Files:" && ls -la
+            """
+          }
         }
       }
     }
@@ -64,10 +70,6 @@ pipeline {
             sh """
               git config user.email "jenkins@local"
               git config user.name "Jenkins"
-
-              # Ensure repo has a remote (in case checkout scm detached)
-              git remote remove origin || true
-              git remote add origin ${REPO_URL}
 
               git add ${CHART_PATH}/values.yaml
               git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
