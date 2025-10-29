@@ -99,7 +99,7 @@
 </head>
 <body>
   <div class="form-container">
-    <h1>Contact Us</h1>
+    <h1>Contact Us please</h1>
     <form method="POST" action="/submit.php">
       <label>Name:
         <input type="text" name="name" required>
