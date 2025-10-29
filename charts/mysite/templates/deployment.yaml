@@ -25,35 +25,35 @@ spec:
               containerPort: 80
               protocol: TCP
 
-          # Health checks
+          # ✅ Fixed Health Checks (previously caused 403)
           livenessProbe:
             httpGet:
               path: /
-              port: http
-            initialDelaySeconds: 10
+              port: 80
+            initialDelaySeconds: 15
             periodSeconds: 10
-            timeoutSeconds: 3
+            timeoutSeconds: 5
             failureThreshold: 3
 
           readinessProbe:
             httpGet:
               path: /
-              port: http
-            initialDelaySeconds: 5
+              port: 80
+            initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
 
-          # Optional resource limits (tune later if needed)
+          # Optional resource limits
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
 
-          # Working directory and volume mount (if static files)
+          # Mount application files if needed
           volumeMounts:
             - name: app-content
               mountPath: /var/www/html
 
-      # Define volume for app files (optional)
+      # Define volume for app files
       volumes:
         - name: app-content
           emptyDir: {}
