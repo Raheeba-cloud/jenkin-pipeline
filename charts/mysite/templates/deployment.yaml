@@ -25,10 +25,10 @@ spec:
               containerPort: 80
               protocol: TCP
 
-          # ✅ Fixed Health Checks (previously caused 403)
+          # ✅ Fixed Health Checks - use /healthz instead of /
           livenessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: 80
             initialDelaySeconds: 15
             periodSeconds: 10
@@ -37,7 +37,7 @@ spec:
 
           readinessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 5
