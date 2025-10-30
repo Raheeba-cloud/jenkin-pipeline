@@ -25,7 +25,7 @@ spec:
               containerPort: 80
               protocol: TCP
 
-          # ✅ Fixed Health Checks - use /healthz instead of /
+          # ✅ Health checks
           livenessProbe:
             httpGet:
               path: /healthz
@@ -47,13 +47,3 @@ spec:
           # Optional resource limits
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-
-          # Mount application files if needed
-          volumeMounts:
-            - name: app-content
-              mountPath: /var/www/html
-
-      # Define volume for app files
-      volumes:
-        - name: app-content
-          emptyDir: {}
