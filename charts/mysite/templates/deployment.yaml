@@ -28,7 +28,7 @@ spec:
           # ✅ Health checks
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /
               port: 80
             initialDelaySeconds: 15
             periodSeconds: 10
@@ -37,7 +37,7 @@ spec:
 
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 5
