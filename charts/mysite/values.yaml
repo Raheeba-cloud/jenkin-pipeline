@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: "raheeba/my-php-site"   # ✅ Correct image name
-  tag: 40
+  tag: 45
   pullPolicy: Always
 
 service:
