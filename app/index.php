@@ -8,98 +8,103 @@
   <title>MySite - Contact Form</title>
   <style>
     /* Reset default browser styles */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
 
-    body {
-      background: linear-gradient(to right, #6a11cb, #2575fc);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
+body {
+  background: #0d0d0d; /* Black luxury background */
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
 
-    .form-container {
-      background: #fff;
-      padding: 40px 50px;
-      border-radius: 12px;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-      width: 100%;
-      max-width: 500px;
-    }
+/* Form */
+.form-container {
+  background: #1a1a1a;
+  padding: 45px 55px;
+  border-radius: 14px;
+  border: 1px solid #b9972d; /* Gold border */
+  box-shadow: 0 8px 30px rgba(255, 215, 0, 0.15);
+  width: 100%;
+  max-width: 500px;
+}
 
-    h1 {
-      text-align: center;
-      color: #333;
-      margin-bottom: 30px;
-      font-size: 2em;
-      letter-spacing: 1px;
-    }
+h1 {
+  text-align: center;
+  color: #d4af37;
+  margin-bottom: 30px;
+  font-size: 2.2em;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
 
-    label {
-      display: block;
-      margin-bottom: 15px;
-      color: #555;
-      font-weight: 500;
-    }
+/* Inputs */
+label {
+  display: block;
+  margin-bottom: 15px;
+  color: #e6e6e6;
+  font-weight: 500;
+}
 
-    input[type="text"],
-    input[type="email"],
-    textarea {
-      width: 100%;
-      padding: 12px 15px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      font-size: 1em;
-      transition: 0.3s;
-    }
+input[type="text"],
+input[type="email"],
+textarea {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #555;
+  border-radius: 8px;
+  font-size: 1em;
+  color: #fff;
+  background: #222;
+  transition: 0.3s;
+}
 
-    input[type="text"]:focus,
-    input[type="email"]:focus,
-    textarea:focus {
-      border-color: #2575fc;
-      outline: none;
-      box-shadow: 0 0 8px rgba(37, 117, 252, 0.3);
-    }
+input:focus,
+textarea:focus {
+  border-color: #d4af37;
+  outline: none;
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.4);
+}
 
-    button {
-      width: 100%;
-      padding: 15px;
-      background: #2575fc;
-      color: #fff;
-      font-size: 1.1em;
-      font-weight: bold;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: 0.3s;
-    }
+/* Button */
+button {
+  width: 100%;
+  padding: 15px;
+  background: #d4af37;
+  color: #000;
+  font-size: 1.15em;
+  font-weight: bold;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.35s ease-in-out;
+  box-shadow: 0 4px 18px rgba(212,175,55,0.35);
+}
 
-    button:hover {
-      background: #6a11cb;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
+button:hover {
+  background: #b9972d;
+  transform: translateY(-4px) scale(1.02); /* Hover animation */
+  box-shadow: 0 6px 25px rgba(212,175,55,0.5);
+}
 
-    textarea {
-      resize: vertical;
-    }
-
-    @media (max-width: 600px) {
-      .form-container {
-        padding: 30px 20px;
-      }
-    }
+/* Responsive */
+@media (max-width: 600px) {
+  .form-container {
+    padding: 35px 25px;
+  }
+}
   </style>
 </head>
 <body>
   <div class="form-container">
-    <h1>Contact Us edited</h1>
+    <h1>Contact Us</h1>
     <form method="POST" action="/submit.php">
       <label>Name:
         <input type="text" name="name" required>
